@@ -22,6 +22,7 @@ import {
 import type { InteractionContext } from "@copilotkit/channels";
 export { searchTheWeb } from "./search";
 import { z } from "zod";
+import { WebClient } from "@slack/web-api";
 
 /**
  * Read the incident context already present in the conversation.
@@ -123,5 +124,97 @@ export const proposeAction = defineChannelTool({
     );
 
     return "Proposal posted; decision pending. Stop here. Do not take the action, call write tools, or offer a workaround. A later click only reports the decision; no action is executed and the agent does not automatically resume.";
+  },
+});
+
+/**
+ * `read_thread` only ever sees the Slack thread the current turn is running
+ * in — the managed SDK scopes conversation history by Slack `thread_ts`, and
+ * a top-level channel message is its own thread of one. Decisions in this
+ * demo are discussed across plain channel messages and separate threads, so
+ * this bypasses that scoping and reads Slack directly with the bot token,
+ * merging top-level history with every thread's replies.
+ */
+function slackBotToken(): string | undefined {
+  const code = (process.env.CHANNEL_CODE ?? "").toUpperCase().replace(/-/g, "_");
+  return process.env[`INTELLIGENCE_CHANNEL_${code}_SLACK_BOT_TOKEN`];
+}
+
+/**
+ * The public `Thread` type doesn't expose the Slack channel id — only the
+ * internal `Thread` class carries `conversationKey` (`"<channelId>::<scope>"`,
+ * per the Slack adapter's own `conversationKeyOf`/`getOrCreate` parsing). Read
+ * it defensively so a future SDK change degrades to a clear message instead of
+ * a runtime crash.
+ */
+function channelIdOf(thread: unknown): string | undefined {
+  const key = (thread as { conversationKey?: unknown }).conversationKey;
+  if (typeof key !== "string") return undefined;
+  return key.split("::")[0] || undefined;
+}
+
+const userNameCache = new Map<string, string>();
+
+async function resolveUserName(client: WebClient, userId: string): Promise<string> {
+  if (userNameCache.has(userId)) return userNameCache.get(userId)!;
+  const name = await client.users
+    .info({ user: userId })
+    .then((r) => r.user?.real_name || r.user?.name || userId)
+    .catch(() => userId);
+  userNameCache.set(userId, name);
+  return name;
+}
+
+async function fetchChannelMessages(client: WebClient, channelId: string) {
+  const { messages: top = [] } = await client.conversations.history({ channel: channelId, limit: 200 });
+  const all = [...top];
+  for (const m of top) {
+    if (m.reply_count && m.ts) {
+      const { messages: replies = [] } = await client.conversations
+        .replies({ channel: channelId, ts: m.ts, limit: 200 })
+        .catch(() => ({ messages: [] }));
+      all.push(...replies.slice(1)); // [0] is the parent, already in `top`
+    }
+  }
+  const seen = new Set<string>();
+  return all
+    .filter((m) => m.ts && m.text && !m.bot_id && !seen.has(m.ts) && seen.add(m.ts))
+    .sort((a, b) => Number(a.ts) - Number(b.ts));
+}
+
+export const readChannel = defineChannelTool({
+  name: "read_channel",
+  description:
+    "Read the recent messages across the WHOLE Slack channel — every thread and every top-level message, not just the one this turn is running in. Call this FIRST, instead of read_thread, whenever the decision might span more than the current thread (which is the normal case here).",
+  parameters: z.object({}),
+  async handler(_args, { thread }) {
+    const token = slackBotToken();
+    if (!token) {
+      return "Channel-wide history isn't available (missing Slack bot token in this environment). Fall back to read_thread.";
+    }
+    const channelId = channelIdOf(thread);
+    if (!channelId) {
+      return "Could not resolve the Slack channel id for this conversation. Fall back to read_thread.";
+    }
+    const client = new WebClient(token);
+    let messages: Awaited<ReturnType<typeof fetchChannelMessages>>;
+    try {
+      messages = await fetchChannelMessages(client, channelId);
+    } catch (err) {
+      // Never let a Slack API failure (rate limit, missing scope, bot not in
+      // channel) throw out of a tool call — an unresolved tool call breaks the
+      // model's message history ("tool results are missing"). Degrade instead.
+      const reason = err instanceof Error ? err.message : String(err);
+      return `Could not read the channel's history (${reason}). Fall back to read_thread.`;
+    }
+    if (messages.length === 0) {
+      return "This channel has no readable message history yet.";
+    }
+    return Promise.all(
+      messages.map(async (m) => ({
+        author: await resolveUserName(client, m.user ?? "unknown"),
+        text: m.text,
+      })),
+    );
   },
 });

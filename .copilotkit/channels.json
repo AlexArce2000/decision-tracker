@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "channels": [
+    {
+      "name": "mi-decision-tracker",
+      "displayName": "Decision Tracker",
+      "providers": {
+        "slack": {
+          "env": {
+            "botToken": "INTELLIGENCE_CHANNEL_MI_DECISION_TRACKER_SLACK_BOT_TOKEN",
+            "signingSecret": "INTELLIGENCE_CHANNEL_MI_DECISION_TRACKER_SLACK_SIGNING_SECRET"
+          }
+        }
+      }
+    }
+  ]
+}

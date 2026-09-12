@@ -2,12 +2,13 @@ import { createChannel } from "@copilotkit/channels";
 import { isSearchConfigured, isWorkplaceConfigured, WORKPLACE_CONTEXT } from "agent-core";
 import { makeChannelAgent } from "./agent";
 import { required } from "./env";
-import { IncidentCard, Timeline, welcomeMessage } from "./components";
-import { proposeAction, readThread, searchTheWeb } from "./tools";
+import { proposeAction, readChannel, readThread, searchTheWeb } from "./tools";
+import { DecisionCard, welcomeMessage } from "./components"; 
 
 // Tools are registered only when their credential is present, so the agent is
 // never handed a tool that will fail when it calls it.
 const tools = [
+  readChannel,
   readThread,
   proposeAction,
   ...(isSearchConfigured() ? [searchTheWeb] : []),
@@ -26,7 +27,7 @@ export const channel = createChannel({
 
   agent: makeChannelAgent,
   tools,
-  components: [IncidentCard, Timeline],
+  components: [DecisionCard],
 
   // Injected into the agent's prompt on every run.
   context: [
@@ -34,7 +35,7 @@ export const channel = createChannel({
     {
       description: "Rendering",
       value:
-        "You can draw native UI by calling incident_card or timeline. Prefer them over prose whenever the answer has structure.",
+        "You can draw native UI by calling decision_card. Prefer it over prose whenever the discussion's state has structure.",
     },
     ...(isWorkplaceConfigured()
       ? [{ description: "Workplace", value: WORKPLACE_CONTEXT }]

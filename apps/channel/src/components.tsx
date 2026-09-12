@@ -129,17 +129,17 @@ export const Timeline = defineChannelComponent({
 export function welcomeMessage(platform: string) {
   return (
     <Message accent="#C4145F">
-      <Header>On-call assistant, in the thread</Header>
+      <Header>Marcador de decisiones, en el hilo</Header>
       <Section>
         <Markdown>
-          {"When something breaks, @-mention me. I read what has already been said in this " +
+          {"Cuando el equipo esté decidiendo algo, mencioname. Leo lo que ya se dijo en este " +
             platform +
-            " thread first — you should never have to re-explain an outage to me."}
+            " hilo primero — nunca deberías tener que re-explicarme la discusión."}
         </Markdown>
       </Section>
       <Fields>
-        <Field label="I will">Summarise, keep a timeline, look things up</Field>
-        <Field label="I won't">Touch production without a click</Field>
+        <Field label="Hago">Resumir, trackear el estado, mostrar quién apoya qué</Field>
+        <Field label="No hago">Cerrar la decisión por vos</Field>
       </Fields>
       <Actions>
         <Button
@@ -148,13 +148,56 @@ export function welcomeMessage(platform: string) {
           onClick={async ({ thread }) => {
             await thread.runAgent({
               prompt:
-                "Read this thread and bring me up to speed on the incident. Draw the incident card.",
+                "Leé este hilo y decime en qué quedamos. Dibujá la tarjeta.",
             });
           }}
         >
-          Catch me up
+          Ponéme al día
         </Button>
       </Actions>
     </Message>
   );
 }
+const ESTADO = {
+  decidiendo: { accent: "#5B6478", label: "DECIDIENDO" },
+  trabado:    { accent: "#8A5C10", label: "TRABADO" },
+  decidido:   { accent: "#2E7D5B", label: "DECIDIDO" },
+} as const;
+
+/**
+ * El estado de una decisión del equipo, como una sola tarjeta.
+ */
+export const DecisionCard = defineChannelComponent({
+  name: "decision_card",
+  description:
+    "Draw the current state of a team decision: status, topic, where the discussion stands, who supports what, objections raised, and what's missing to close it. Call it once you've read the thread, and again ONLY when the discussion's state changes.",
+  parameters: z.object({
+    estado: z.enum(["decidiendo", "trabado", "decidido"]),
+    tema: z.string().describe("De qué se está hablando, en menos de diez palabras."),
+    situacion: z.string().describe("Dónde está parada la discusión ahora."),
+    aFavor: z.array(z.string()).max(4).default([]).describe("Quiénes apoyan y por qué."),
+    objeciones: z.array(z.string()).max(3).default([]).describe("Qué se objetó, con quién lo dijo."),
+    falta: z.string().describe("Qué falta para cerrar. 'nada' es válido."),
+    responsable: z.string().optional().describe("Quién quedó a cargo, si el hilo lo dice."),
+  }),
+  render({ estado, tema, situacion, aFavor, objeciones, falta, responsable }) {
+    const e = ESTADO[estado];
+    return (
+      <Message accent={e.accent}>
+        <Header>{tema}</Header>
+        <Context>{e.label}</Context>
+        <Fields>
+          <Field label="Situación">{situacion}</Field>
+          <Field label="Falta">{falta}</Field>
+          {responsable && <Field label="Responsable">{responsable}</Field>}
+        </Fields>
+        {aFavor.length > 0 && (
+          <Section><Markdown>{`*A favor*\n${aFavor.map((a) => `• ${a}`).join("\n")}`}</Markdown></Section>
+        )}
+        {objeciones.length > 0 && (
+          <Section><Markdown>{`*Objeciones*\n${objeciones.map((o) => `• ${o}`).join("\n")}`}</Markdown></Section>
+        )}
+      </Message>
+    );
+  },
+});
