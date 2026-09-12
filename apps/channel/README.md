@@ -2,7 +2,7 @@
 
 **OpenAI + CopilotKit Channels + Exa**
 
-Build an agent that reads an existing conversation, researches what matters, and replies in the same Slack thread with native cards and source links. Try a team research discussion, support handoff, project decision, or incident review. The included incident scenario shows how the infrastructure fits together; replace it with your own workflow.
+Build an agent that reads an existing conversation, researches what matters, and replies in the same Slack thread with native cards and source links. Try a team research discussion, support handoff, project decision, or incident review. This build replaces the sample incident scenario with a decision tracker: mention the agent once in a thread where the team is deciding something, and it keeps a single `decision_card` (status, topic, support, objections, what's missing) redrawn only when the discussion's state actually changes — the same component, rendered natively, on both this Slack surface and the web app.
 
 [![Slack thread agent demo](../../assets/demos/slack.gif)](../../assets/demos/slack.mp4)
 
@@ -53,7 +53,7 @@ Use [demo prompts](../../dev-docs/demo-prompts.md#slack-context-sources-card-fol
 | Channel lifecycle | [src/channel.tsx](src/channel.tsx): mention, subscribe, respond to subscribed messages |
 | Channel-only run adapter | [src/agent.ts](src/agent.ts): keeps outer transcript/state while using fresh inner agent runs |
 | Thread context and research | [src/tools.tsx](src/tools.tsx) and [src/search.tsx](src/search.tsx): `read_thread` and Exa-backed `search_web` |
-| Native cards | [src/components.tsx](src/components.tsx): incident card and timeline via Channels JSX |
+| Native cards | [src/components.tsx](src/components.tsx): `decision_card` via Channels JSX |
 | Prompt | [Shared prompt](../../packages/agent-core/src/prompt.ts) |
 
 OpenRouter can be used as the model gateway through the shared provider settings in [using-sponsor-tools.md](../../using-sponsor-tools.md#openrouter). Teams or another messaging platform can reuse the Channels pattern, but this starter app is wired for managed Slack.
