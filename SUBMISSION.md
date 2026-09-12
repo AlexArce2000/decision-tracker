@@ -4,29 +4,35 @@ Choose your city on the [global event page](https://aitinkerers.org/hackathons/g
 
 ## Build eligibility
 
-- [ ] Our submitted project is a net-new build created during the official hackathon period
-- [ ] Its core functionality was built during the event; we are not resubmitting or extending a pre-existing project and entering it as new
-- [ ] We identify inherited templates, libraries, prompts, components, and starter code separately from our event work
+- [x] Our submitted project is a net-new build created during the official hackathon period
+- [x] Its core functionality was built during the event; we are not resubmitting or extending a pre-existing project and entering it as new
+- [x] We identify inherited templates, libraries, prompts, components, and starter code separately from our event work
 
 **What we inherited**
-<!-- Include this starter kit and any reused examples. -->
+This starter kit (`agents-everywhere-starter-kit`, CopilotKit): the Slack Channel scaffolding (`apps/channel`), the Web scaffolding (`apps/web`), the shared agent runtime (`packages/agent-core`), the `IncidentCard`/`Timeline` reference components, the `read_thread`/`propose_action` tool implementations, and the `useHumanInTheLoop` approval-gate pattern in `generative-ui.tsx`. None of the sample on-call/incident scenario or its data is part of our submission — it was a wiring reference we replaced.
 
 **What we built during the hackathon**
-<!-- Describe the new core interaction and point to its implementation. Running the supplied incident demo alone does not establish a new project. -->
+A single shared contract, `decision_card` (`estado`, `tema`, `situacion`, `aFavor`, `objeciones`, `falta`, `responsable`), implemented as a native component on both surfaces from the inherited `IncidentCard` pattern:
+- `apps/channel/src/components.tsx` — `DecisionCard` for Slack (Block Kit).
+- `apps/web/src/components/streamed-cards.tsx` + `generative-ui.tsx` — the same component in React.
+- `packages/agent-core/src/prompt.ts` — a new `DECISION_ROLE` system prompt (replacing the on-call role) that tells the agent to read the thread, redraw the card only when the discussion's state actually changes, never insert itself into the decision, and route any save through the approval gate rather than a text confirmation.
+- `apps/channel/src/channel.tsx` — registered `DecisionCard` in place of the incident components.
 
 ## Title and description
 
 **What you built**
-<!-- Explain the complete interaction your demo shows. -->
+**Decision Tracker** — an agent that lives inside a team's Slack thread (and the web app, with the same component) and keeps one always-current card of a decision in progress: what's being decided, who supports what, what's blocking it, and what's left to close it. Mention it once; it keeps redrawing the card as the conversation moves, without being re-mentioned, and only changes the card when the discussion's actual state changes — not on every message.
 
 **Who it is for**
-<!-- Name a person in a concrete situation. -->
+A team mid-discussion in a Slack thread (e.g., "Postgres vs Mongo for this project") where the thread has grown long enough that someone eventually asks "wait, what did we decide?" — instead of someone manually re-reading and summarizing, the card is already there and current.
 
 **Why the context matters**
-<!-- What did the agent know or do because it lived in this surface? -->
+The agent reads the live thread (`read_thread`) before drawing anything — it never asks people to repeat context that's already in the conversation. Copying the same thread into a standalone chatbox would lose exactly this: the agent would only ever see what someone chose to paste, not the discussion as it evolves in place.
 
 **Sponsor technologies used**
-<!-- Name the tools you actually used and the visible contribution of each. -->
+- **CopilotKit Channels** — the managed Slack integration (`defineChannelComponent`, `defineChannelTool`, `createChannel`), no self-hosted Slack app or public URL needed.
+- **CopilotKit React (`useComponent`, `useHumanInTheLoop`)** — the same `decision_card` contract rendered natively in the web app, and the approval gate for saving a decision.
+- **OpenAI** — the chat model behind the agent on both surfaces.
 
 ## Evidence for the judging criteria
 
