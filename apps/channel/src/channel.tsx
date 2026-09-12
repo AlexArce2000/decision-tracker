@@ -2,13 +2,12 @@ import { createChannel } from "@copilotkit/channels";
 import { isSearchConfigured, isWorkplaceConfigured, WORKPLACE_CONTEXT } from "agent-core";
 import { makeChannelAgent } from "./agent";
 import { required } from "./env";
-import { proposeAction, readChannel, readThread, searchTheWeb } from "./tools";
+import { proposeAction, readThread, searchTheWeb } from "./tools";
 import { DecisionCard, welcomeMessage } from "./components"; 
 
 // Tools are registered only when their credential is present, so the agent is
 // never handed a tool that will fail when it calls it.
 const tools = [
-  readChannel,
   readThread,
   proposeAction,
   ...(isSearchConfigured() ? [searchTheWeb] : []),
